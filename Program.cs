@@ -7,14 +7,21 @@ using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// FORCE RAILWAY PORT (required)
+var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.ListenAnyIP(int.Parse(port));
+});
+
 // Add controllers
 builder.Services.AddControllers();
 
-// Swagger (API documentation)
+// Swagger (ALWAYS ENABLE — Railway cannot run IsDevelopment())
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Connect to SQL Server
+// SQL Server
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"))
 );
@@ -22,7 +29,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // Email service
 builder.Services.AddScoped<EmailService>();
 
-// Add JWT authentication
+// JWT
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -48,18 +55,20 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-// Enable Swagger UI in Development
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+// Swagger ALWAYS ON
+app.UseSwagger();
+app.UseSwaggerUI();
 
-app.UseHttpsRedirection();
+// Railway does NOT support HTTPS redirection — REMOVE IT
+// app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseAuthorization();
 
+// Root endpoint for testing
+app.MapGet("/", () => "SmartPark Auth API is running");
+
+// Controllers
 app.MapControllers();
 
 app.Run();
