@@ -4,34 +4,61 @@ using demoApi.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// FORCE RAILWAY PORT (required)
+// ------------------------
+// FORCE RAILWAY PORT
+// ------------------------
 var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
 builder.WebHost.ConfigureKestrel(options =>
 {
     options.ListenAnyIP(int.Parse(port));
 });
 
-// Add controllers
+// ------------------------
+// Add Controllers & Swagger
+// ------------------------
 builder.Services.AddControllers();
-
-// Swagger (ALWAYS ENABLE — Railway cannot run IsDevelopment())
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// DB
-var connectionString = Environment.GetEnvironmentVariable("DATABASE_URL")
-                       ?? builder.Configuration.GetConnectionString("DefaultConnection");
+// ------------------------
+// DATABASE: Convert Railway URL if needed
+// ------------------------
+var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL")
+                  ?? builder.Configuration.GetConnectionString("DefaultConnection");
+
+if (databaseUrl != null && databaseUrl.StartsWith("postgres://"))
+{
+    var uri = new Uri(databaseUrl);
+    var userInfo = uri.UserInfo.Split(':');
+    var npgsqlBuilder = new NpgsqlConnectionStringBuilder()
+    {
+        Host = uri.Host,
+        Port = uri.Port,
+        Username = userInfo[0],
+        Password = userInfo[1],
+        Database = uri.AbsolutePath.TrimStart('/'),
+        SslMode = SslMode.Require,
+        TrustServerCertificate = true
+    };
+    databaseUrl = npgsqlBuilder.ToString();
+}
+
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(connectionString)
+    options.UseNpgsql(databaseUrl)
 );
 
-// Email service
+// ------------------------
+// Email Service
+// ------------------------
 builder.Services.AddScoped<EmailService>();
 
-// JWT
+// ------------------------
+// JWT Authentication
+// ------------------------
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -55,39 +82,51 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddAuthorization();
 
+// ------------------------
+// Build App
+// ------------------------
 var app = builder.Build();
 
-// Swagger ALWAYS ON
+// ------------------------
+// Swagger
+// ------------------------
 app.UseSwagger();
 app.UseSwaggerUI();
 
-// Railway does NOT support HTTPS redirection — REMOVE IT
-// app.UseHttpsRedirection();
-app.UseExceptionHandler(a => a.Run(async context =>
-{
-    var feature = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
-    var exception = feature?.Error;
-
-    context.Response.ContentType = "application/json";
-    context.Response.StatusCode = 500;
-
-    if (exception != null)
-    {
-        await context.Response.WriteAsJsonAsync(new
-        {
-            error = exception.Message,
-            stackTrace = exception.StackTrace
-        });
-    }
-}));
-
+// ------------------------
+// Middleware
+// ------------------------
 app.UseAuthentication();
 app.UseAuthorization();
 
+// ------------------------
 // Root endpoint for testing
+// ------------------------
 app.MapGet("/", () => "SmartPark Auth API is running");
 
+// ------------------------
 // Controllers
+// ------------------------
 app.MapControllers();
 
+// ------------------------
+// Auto-migrate DB on startup (optional)
+// ------------------------
+using (var scope = app.Services.CreateScope())
+{
+    try
+    {
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.Database.Migrate();
+        Console.WriteLine("Database migrated successfully.");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine("Database migration error: " + ex.Message);
+    }
+}
+
+// ------------------------
+// Run App
+// ------------------------
 app.Run();
