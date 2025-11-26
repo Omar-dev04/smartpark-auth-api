@@ -29,15 +29,6 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString)
 );
 
-
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(connectionString)
-);
-
-
-
-
-
 // Email service
 builder.Services.AddScoped<EmailService>();
 
@@ -73,6 +64,23 @@ app.UseSwaggerUI();
 
 // Railway does NOT support HTTPS redirection — REMOVE IT
 // app.UseHttpsRedirection();
+app.UseExceptionHandler(a => a.Run(async context =>
+{
+    var feature = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
+    var exception = feature?.Error;
+
+    context.Response.ContentType = "application/json";
+    context.Response.StatusCode = 500;
+
+    if (exception != null)
+    {
+        await context.Response.WriteAsJsonAsync(new
+        {
+            error = exception.Message,
+            stackTrace = exception.StackTrace
+        });
+    }
+}));
 
 app.UseAuthentication();
 app.UseAuthorization();
