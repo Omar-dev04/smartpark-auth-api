@@ -27,7 +27,7 @@ namespace demoApi.Services
                 {
                     UseDefaultCredentials = false,
                     Credentials = new NetworkCredential(from, password),
-                    EnableSsl = true
+                    EnableSsl = bool.Parse(emailSettings["EnableSsl"] ?? "true");
                 };
 
                 var mail = new MailMessage(from, to, subject, body) { IsBodyHtml = true };
