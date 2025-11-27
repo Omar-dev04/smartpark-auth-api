@@ -15,28 +15,29 @@ namespace demoApi.Services
 
         public void SendEmail(string to, string subject, string body)
         {
-            var emailSettings = _config.GetSection("EmailSettings");
-            var from = emailSettings["From"];
-            var password = emailSettings["Password"];
-            var host = emailSettings["Host"];
-            var port = int.Parse(emailSettings["Port"]);
-
-            using (var client = new SmtpClient(host, port))
+            try
             {
-                client.UseDefaultCredentials = false; 
-                client.Credentials = new NetworkCredential(from, password);
-                client.EnableSsl = true; 
-                client.DeliveryMethod = SmtpDeliveryMethod.Network; 
+                var emailSettings = _config.GetSection("EmailSettings");
+                var from = emailSettings["From"];
+                var password = emailSettings["Password"];
+                var host = emailSettings["Host"];
+                var port = int.Parse(emailSettings["Port"]);
 
-                var mail = new MailMessage();
-                mail.From = new MailAddress(from, "Smart Parking System");
-                mail.To.Add(to);
-                mail.Subject = subject;
-                mail.Body = body;
-                mail.IsBodyHtml = true;
+                using var client = new SmtpClient(host, port)
+                {
+                    UseDefaultCredentials = false,
+                    Credentials = new NetworkCredential(from, password),
+                    EnableSsl = true
+                };
 
+                var mail = new MailMessage(from, to, subject, body) { IsBodyHtml = true };
                 client.Send(mail);
             }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Email Error: {ex.Message}"); // 🚀 no crash
+            }
         }
+
     }
 }
