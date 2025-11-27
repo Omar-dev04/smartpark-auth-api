@@ -63,18 +63,27 @@ namespace demoApi.Controllers
             _context.Users.Add(user);
             _context.SaveChanges();
 
-            // SEND WELCOME EMAIL
-            var subject = "🎉 Welcome to Smart Sayes!";
-            var body = $@"
-                <div style='font-family:Segoe UI,Arial;padding:35px;background:#f4f7fb;border-radius:10px'>
-                    <h2 style='color:#173C65'>Welcome {user.FullName} 🚗</h2>
-                    <p>Your account is now active. Login using <b>{user.Email}</b></p>
-                </div>";
+            // Send welcome email safely
+            try
+            {
+                var subject = "🎉 Welcome to Smart Sayes!";
+                var body = $@"
+            <div style='font-family:Segoe UI,Arial;padding:35px;background:#f4f7fb;border-radius:10px'>
+                <h2 style='color:#173C65'>Welcome {user.FullName} 🚗</h2>
+                <p>Your account is now active. Login using <b>{user.Email}</b></p>
+            </div>";
 
-            _emailService.SendEmail(user.Email, subject, body);
+                _emailService.SendEmail(user.Email, subject, body);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"📩 Email send failed: {ex.Message}");
+                // Do not block registration
+            }
 
             return Ok("User registered successfully.");
         }
+
 
         // ------------------------------------------------ LOGIN ------------------------------------------------
         [HttpPost("login")]
@@ -84,21 +93,39 @@ namespace demoApi.Controllers
             if (string.IsNullOrWhiteSpace(req.Email)) return BadRequest("Email required.");
             if (string.IsNullOrWhiteSpace(req.Password)) return BadRequest("Password required.");
 
-            var existingUser = _context.Users.FirstOrDefault(u => u.Email == req.Email);
+            try
+            {
+                var existingUser = _context.Users.FirstOrDefault(u => u.Email == req.Email);
 
-            if (existingUser == null)
-                return Unauthorized("Invalid email or password.");
+                if (existingUser == null)
+                    return Unauthorized("Invalid email or password.");
 
-            if (existingUser.Password == null)
-                return Unauthorized("Account registered with Google login only.");
+                if (string.IsNullOrEmpty(existingUser.Password))
+                    return Unauthorized("Account registered with Google login only.");
 
-            bool verified = BCrypt.Net.BCrypt.Verify(req.Password, existingUser.Password);
+                // Safe BCrypt verification
+                bool verified = false;
+                try
+                {
+                    verified = BCrypt.Net.BCrypt.Verify(req.Password, existingUser.Password);
+                }
+                catch
+                {
+                    // In case hash is invalid
+                    return Unauthorized("Invalid email or password.");
+                }
 
-            if (!verified)
-                return Unauthorized("Invalid email or password.");
+                if (!verified)
+                    return Unauthorized("Invalid email or password.");
 
-            var token = GenerateJwtToken(existingUser);
-            return Ok(new { Token = token });
+                var token = GenerateJwtToken(existingUser);
+                return Ok(new { Token = token });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️ Login error: {ex.Message}");
+                return StatusCode(500, "Internal server error during login.");
+            }
         }
 
         // ------------------------------------------------ GOOGLE LOGIN ------------------------------------------------
