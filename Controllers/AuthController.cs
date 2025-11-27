@@ -50,7 +50,15 @@ namespace demoApi.Controllers
             if (!Regex.IsMatch(req.Email, emailRegex))
                 return BadRequest("Invalid email format.");
 
-            string hashed = BCrypt.Net.BCrypt.HashPassword(req.Password, workFactor: 12);
+            string hashed;
+            try
+            {
+                hashed = BCrypt.Net.BCrypt.HashPassword(req.Password, workFactor: 12);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, "Password hashing failed: " + ex.Message);
+            }
 
             var user = new User
             {
@@ -60,30 +68,38 @@ namespace demoApi.Controllers
                 PhoneNumber = req.PhoneNumber
             };
 
-            _context.Users.Add(user);
-            _context.SaveChanges();
-
-            // Send welcome email safely
             try
             {
-                var subject = "🎉 Welcome to Smart Sayes!";
-                var body = $@"
-            <div style='font-family:Segoe UI,Arial;padding:35px;background:#f4f7fb;border-radius:10px'>
-                <h2 style='color:#173C65'>Welcome {user.FullName} 🚗</h2>
-                <p>Your account is now active. Login using <b>{user.Email}</b></p>
-            </div>";
-
-                _emailService.SendEmail(user.Email, subject, body);
+                _context.Users.Add(user);
+                _context.SaveChanges();
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"📩 Email send failed: {ex.Message}");
-                // Do not block registration
+                return StatusCode(500, "Database error: " + ex.Message);
             }
+
+            // Send email asynchronously so it doesn't block registration
+            Task.Run(() =>
+            {
+                try
+                {
+                    var subject = "🎉 Welcome to Smart Sayes!";
+                    var body = $@"
+                <div style='font-family:Segoe UI,Arial;padding:35px;background:#f4f7fb;border-radius:10px'>
+                    <h2 style='color:#173C65'>Welcome {user.FullName} 🚗</h2>
+                    <p>Your account is now active. Login using <b>{user.Email}</b></p>
+                </div>";
+
+                    _emailService.SendEmail(user.Email, subject, body);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"📩 Email send failed: {ex.Message}");
+                }
+            });
 
             return Ok("User registered successfully.");
         }
-
 
         // ------------------------------------------------ LOGIN ------------------------------------------------
         [HttpPost("login")]
@@ -111,14 +127,24 @@ namespace demoApi.Controllers
                 }
                 catch
                 {
-                    // In case hash is invalid
                     return Unauthorized("Invalid email or password.");
                 }
 
                 if (!verified)
                     return Unauthorized("Invalid email or password.");
 
-                var token = GenerateJwtToken(existingUser);
+                // Generate JWT safely
+                string token;
+                try
+                {
+                    token = GenerateJwtToken(existingUser);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"JWT generation error: {ex.Message}");
+                    return StatusCode(500, "Error generating token.");
+                }
+
                 return Ok(new { Token = token });
             }
             catch (Exception ex)

@@ -20,9 +20,9 @@ namespace demoApi.Services
                 var emailSettings = _config.GetSection("EmailSettings");
                 var from = emailSettings["From"];
                 var password = emailSettings["Password"];
-                var host = emailSettings["Host"];
-                var port = int.Parse(emailSettings["Port"]);
-                var enableSsl = bool.Parse(emailSettings["EnableSsl"] ?? "true");
+                var host = emailSettings["Host"] ?? throw new Exception("SMTP host not configured");
+                var port = int.TryParse(emailSettings["Port"], out var p) ? p : 587;
+                var enableSsl = bool.TryParse(emailSettings["EnableSsl"], out var ssl) ? ssl : true;
 
                 using var client = new SmtpClient(host, port)
                 {
@@ -39,5 +39,6 @@ namespace demoApi.Services
                 Console.WriteLine($"📩 Email Error: {ex.Message}");
             }
         }
+
     }
 }
