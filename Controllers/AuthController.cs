@@ -141,7 +141,7 @@ namespace demoApi.Controllers
                 JwtAudience = _configuration["JwtConfig:Audience"],
                 KeyLength = _configuration["JwtConfig:Key"]?.Length,
                 EmailFrom = _configuration["EmailSettings:From"],
-                EmailHost = _configuration["EmailSettings:SmtpServer"],
+                EmailHost = _configuration["EmailSettings:Host"],
                 EmailSSL = _configuration["EmailSettings:EnableSsl"]
             });
         }
