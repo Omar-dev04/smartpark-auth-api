@@ -22,12 +22,13 @@ namespace demoApi.Services
                 var password = emailSettings["Password"];
                 var host = emailSettings["Host"];
                 var port = int.Parse(emailSettings["Port"]);
+                var enableSsl = bool.Parse(emailSettings["EnableSsl"] ?? "true");
 
                 using var client = new SmtpClient(host, port)
                 {
                     UseDefaultCredentials = false,
                     Credentials = new NetworkCredential(from, password),
-                    EnableSsl = bool.Parse(emailSettings["EnableSsl"] ?? "true");
+                    EnableSsl = enableSsl
                 };
 
                 var mail = new MailMessage(from, to, subject, body) { IsBodyHtml = true };
@@ -35,9 +36,8 @@ namespace demoApi.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Email Error: {ex.Message}"); 
+                Console.WriteLine($"📩 Email Error: {ex.Message}");
             }
         }
-
     }
 }
