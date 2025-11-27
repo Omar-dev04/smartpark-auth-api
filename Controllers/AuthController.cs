@@ -90,7 +90,7 @@ namespace demoApi.Controllers
                   </div>
                 </div>";
 
-            _emailService.SendEmail(user.Email, subject, body);
+            //_emailService.SendEmail(user.Email, subject, body);
 
             return Ok("User registered successfully.");
         }

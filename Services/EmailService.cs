@@ -35,7 +35,7 @@ namespace demoApi.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Email Error: {ex.Message}"); // 🚀 no crash
+                Console.WriteLine($"Email Error: {ex.Message}"); 
             }
         }
 
