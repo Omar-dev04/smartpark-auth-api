@@ -20,13 +20,16 @@ namespace demoApi.Controllers
         private readonly AppDbContext _context;
         private readonly IConfiguration _configuration;
         private readonly EmailService _emailService;
+        private readonly JwtService _jwtService;
 
-        public AuthController(AppDbContext context, IConfiguration configuration, EmailService emailService)
+        public AuthController(AppDbContext context, IConfiguration configuration, EmailService emailService, JwtService jwtService)
         {
             _context = context;
             _configuration = configuration;
             _emailService = emailService;
+            _jwtService = jwtService;
         }
+
 
         // ------------------------------------------------ REGISTER ------------------------------------------------
         [HttpPost("register")]
@@ -119,7 +122,6 @@ namespace demoApi.Controllers
                 if (string.IsNullOrEmpty(existingUser.Password))
                     return Unauthorized("Account registered with Google login only.");
 
-                // Safe BCrypt verification
                 bool verified = false;
                 try
                 {
@@ -133,16 +135,16 @@ namespace demoApi.Controllers
                 if (!verified)
                     return Unauthorized("Invalid email or password.");
 
-                // Generate JWT safely
+                // ✅ Use JwtService
                 string token;
                 try
                 {
-                    token = GenerateJwtToken(existingUser);
+                    token = _jwtService.GenerateToken(existingUser);
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine($"JWT generation error: {ex.Message}");
-                    return StatusCode(500, "Error generating token.");
+                    return StatusCode(500, "Error generating token. Check JWT configuration.");
                 }
 
                 return Ok(new { Token = token });
